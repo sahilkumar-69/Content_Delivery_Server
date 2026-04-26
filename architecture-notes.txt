@@ -1,0 +1,68 @@
+Architecture Notes - Content Broadcasting System Backend
+
+1) RBAC and Authentication
+- Authentication uses JWT bearer tokens with configurable secret and expiry.
+- Passwords are hashed with bcrypt before storing in PostgreSQL.
+- Role-based middleware gates private routes:
+  - teacher: upload and view own content status
+  - principal: list pending content and approve/reject
+- Route safety is layered: requireAuth -> requireRole -> controller logic.
+
+2) Subject and Rotation Design
+- Subject is normalized to lowercase and mapped to a dedicated slot in content_slots.
+- Each uploaded content item is assigned a rotation_order and duration_seconds in content_schedule.
+- Rotation is independent per subject because schedule rows are grouped by slot_id.
+- Live selection computes a deterministic rotating pointer by current epoch seconds modulo total duration.
+
+3) Upload Strategy
+- Multer disk storage writes files to local uploads/ directory.
+- Enforced constraints:
+  - MIME type must be jpg/png/gif.
+  - Maximum upload size is configurable via MAX_UPLOAD_SIZE_MB (default 10MB).
+- File path, type, and size are persisted for auditing and delivery.
+
+4) Approval Workflow
+- Teacher uploads always start in pending state.
+- Principal can review only pending items:
+  - approve -> status=approved, approved_by, approved_at set
+  - reject -> status=rejected, rejection_reason required
+- Public live endpoint filters to approved content only.
+
+5) Scheduling Logic and Edge Cases
+- Live endpoint by subject returns one active item from currently valid approved items.
+- Validity filters:
+  - status is approved
+  - start_time is null or <= now
+  - end_time is null or >= now
+- Edge behavior:
+  - unknown subject -> 200 with "No content available"
+  - no approved content -> 200 with "No content available"
+  - approved but inactive schedule window -> 200 with "No content available"
+
+6) Database Decisions
+- Core tables: users, content, content_slots, content_schedule.
+- Constraints and indexes enforce data quality and runtime performance:
+  - role/status checks
+  - unique email, unique subject slot
+  - unique content schedule row and unique per-slot rotation order
+  - indexes on status+subject and scheduling lookups
+- On app startup, initializeDatabase() creates tables and indexes if missing.
+
+7) Folder Structure
+- src/config: database and schema initialization
+- src/controllers: route handlers for auth/content/approval
+- src/routes: API route maps
+- src/middlewares: auth, role, upload, and error middleware
+- src/services: pure scheduling/rotation logic
+- src/utils: async helper utilities
+
+8) Middleware and Error Handling
+- asyncHandler catches async route failures and forwards to centralized error middleware.
+- notFoundHandler returns a clean JSON 404 for unknown routes.
+- errorHandler returns sanitized server errors without leaking sensitive internals.
+
+9) Scalability Notes
+- Redis cache can be added for /content/live/:subject responses.
+- Queue-based media processing can validate and optimize assets asynchronously.
+- S3/object storage adapter can replace local disk storage without changing controller contracts.
+- Pagination/filtering can be added on teacher and principal listing endpoints.
