@@ -197,9 +197,11 @@ Response example:
 
 ## Principal Endpoints
 
-### GET /api/approval/pending
+### GET /api/approval/:status
 
-Lists all content waiting for review.
+Lists all content with status.
+
+'all' for all content regardless of status
 
 Access:
 
@@ -274,9 +276,9 @@ Success response:
 
 ## Public Content Endpoint
 
-### GET /api/content/live/:subject
+### GET /api/content/live/:teacherId
 
-Returns the currently active approved content for a subject.
+Returns the currently active approved content for a teacher.
 
 Access:
 
@@ -284,12 +286,11 @@ Access:
 
 Path params:
 
-- `subject` - subject name, case-insensitive
+- `teacher` - teacher id, case-sensitive
 
 Examples:
 
-- `/api/content/live/science`
-- `/api/content/live/math`
+- `/api/content/live/1`
 
 Behavior:
 
