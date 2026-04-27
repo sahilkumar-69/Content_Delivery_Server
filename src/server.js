@@ -1,7 +1,8 @@
 import "dotenv/config";
 import express from "express";
-import { checkDatabaseConnection } from "./config/db.js";
+import { checkDatabaseConnection, query } from "./config/db.js";
 import { initializeDatabase } from "./config/initDb.js";
+import { connectRedis } from "./config/redis.js";
 import authRoutes from "./routes/authRoutes.js";
 import contentRoutes from "./routes/contentRoutes.js";
 import approvalRoutes from "./routes/approvalRoutes.js";
@@ -39,6 +40,7 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const startServer = async () => {
+  await connectRedis();
   await initializeDatabase();
   app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);

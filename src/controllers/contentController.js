@@ -1,5 +1,6 @@
 import { query } from "../config/db.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { invalidateTeacherLiveCache } from "../middlewares/cacheMiddleware.js";
 import { pickActiveContent } from "../services/rotationService.js";
 
 const parseOptionalDate = (value) => {
@@ -105,6 +106,7 @@ export const createContent = asyncHandler(async (req, res) => {
     );
 
     await query("COMMIT");
+    await invalidateTeacherLiveCache(req.user.id);
 
     return res.status(201).json({
       message: "Content uploaded and pending approval",
@@ -170,12 +172,16 @@ export const getLiveContentByTeacher = asyncHandler(async (req, res) => {
       JOIN content_schedule cs ON cs.content_id = c.id AND cs.slot_id = s.id
       WHERE c.status = 'approved'
         AND c.uploaded_by = $1
-        AND (c.start_time IS NULL OR c.start_time <= NOW())
-        AND (c.end_time IS NULL OR c.end_time >= NOW())
+        AND c.start_time IS NOT NULL
+        AND c.end_time IS NOT NULL
+        AND c.start_time <= NOW()
+        AND c.end_time >= NOW()
       ORDER BY cs.rotation_order ASC, c.id ASC
     `,
-    [teacher],
+    [parseInt(teacher)],
   );
+
+  //   console.log(result.rows);
 
   const active = pickActiveContent(result.rows, new Date());
 
